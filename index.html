@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f4f7fb">
+  <meta name="theme-color" content="#f4f7fb" id="themeColorMeta">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Wordglass">
@@ -149,6 +149,46 @@
       .study-card { min-height:255px; }
       .modal { padding:20px; }
     }
+    /* Автоматическая тема следует настройкам устройства и меняется без перезагрузки. */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #0d1119;
+        --text: #edf1fa;
+        --muted: #9aa6bb;
+        --line: rgba(255,255,255,.10);
+        --glass: rgba(27,34,48,.72);
+        --glass-strong: rgba(31,39,55,.9);
+        --shadow: 0 18px 50px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.045);
+      }
+      body {
+        background:
+          radial-gradient(ellipse at 12% 0%, rgba(58,83,150,.28), transparent 35%),
+          radial-gradient(ellipse at 88% 12%, rgba(91,62,142,.22), transparent 30%),
+          radial-gradient(ellipse at 55% 95%, rgba(31,112,91,.15), transparent 34%), var(--bg);
+      }
+      .secondary, .dictionary-button, .mode-button, .answer-button, .choice {
+        border-color: rgba(255,255,255,.10);
+        background: rgba(255,255,255,.055);
+        color: var(--text);
+      }
+      .dictionary-button.active, .mode-button.active { background: rgba(91,117,205,.25); color: #c8d3ff; }
+      .donut { background: conic-gradient(#8198ff 0deg, #354057 0deg); }
+      .donut::after { background: #1a2230; box-shadow: inset 0 1px 5px rgba(0,0,0,.2); }
+      .dot.gray { background: #354057; }
+      .motivation {
+        background: linear-gradient(120deg,rgba(37,47,65,.82),rgba(46,53,83,.62),rgba(31,70,61,.52));
+      }
+      .modal { background: rgba(24,31,44,.97); border-color: rgba(255,255,255,.12); }
+      input, textarea { background: rgba(8,13,22,.65); color: var(--text); border-color: rgba(170,185,210,.22); }
+      .icon-button { background: rgba(255,255,255,.09); color: var(--text); }
+      .answer-button.good { color: #8ce7bc; background: rgba(32,135,91,.25); }
+      .answer-button.again { color: #ffacbb; background: rgba(160,49,70,.25); }
+      .choice.correct { background: rgba(32,135,91,.3); border-color: #399f76; }
+      .choice.wrong { background: rgba(160,49,70,.3); border-color: #b95b70; }
+      .toast { background: #e8edf7; color: #17202f; }
+      footer { color: #7f8ba0; }
+    }
     @media (prefers-reduced-motion: reduce) { *,*::before,*::after { transition:none !important; scroll-behavior:auto !important; } }
   </style>
 </head>
@@ -245,6 +285,14 @@
 <script>
 (() => {
   const STORAGE_KEY = 'wordglass_data_v1';
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+  function syncThemeMeta() {
+    const meta = document.getElementById('themeColorMeta');
+    if (meta) meta.setAttribute('content', systemTheme.matches ? '#0d1119' : '#f4f7fb');
+  }
+  syncThemeMeta();
+  if (systemTheme.addEventListener) systemTheme.addEventListener('change', syncThemeMeta);
+  else if (systemTheme.addListener) systemTheme.addListener(syncThemeMeta);
   const $ = (id) => document.getElementById(id);
   let data = loadData();
   let selectedId = data.dictionaries[0]?.id || null;
@@ -427,17 +475,49 @@
     a.href = url; a.download = dict.name.replace(/[^\p{L}\p{N}_-]+/gu,'_') + '.txt'; a.click(); URL.revokeObjectURL(url);
   }
 
-  function startStudy() {
+  function startStudy(excludeIds = []) {
     const dict = selectedDictionary();
     if (!dict || !dict.words.length) { showToast('Добавь в словарь хотя бы одну пару слов.'); return; }
-    const unlearned = dict.words.filter(w => !wordKnown(w));
-    const pool = unlearned.length ? unlearned : dict.words;
-    const shuffled = [...pool].sort(() => Math.random() - .5);
-    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
-    session = { dictId: dict.id, words: selected, index: 0, mode: 'cards', revealed: false, answered: false, results: {correct:0, wrong:0}, seen: new Set() };
+    const excluded = new Set(excludeIds);
+    let pool = dict.words.filter(w => !wordKnown(w) && !excluded.has(w.id));
+    if (!pool.length) pool = dict.words.filter(w => !excluded.has(w.id));
+    if (!pool.length) pool = dict.words;
+    const selected = weightedSample(pool, Math.min(10, pool.length));
+    createSession(dict, selected);
+  }
+  function weightedSample(pool, count) {
+    const remaining = [...pool], picked = [];
+    while (remaining.length && picked.length < count) {
+      const weights = remaining.map(w => {
+        const wrong = Math.max(0, Number(w.wrong) || 0);
+        const correct = Math.max(0, Number(w.correct) || 0);
+        // Ошибки повышают шанс повторения; устойчивые правильные ответы снижают его.
+        return Math.max(0.15, 1 + wrong * 2.5 - correct * 0.65 + (wordKnown(w) ? -0.65 : 0));
+      });
+      const total = weights.reduce((a,b) => a + b, 0);
+      let roll = Math.random() * total, index = 0;
+      for (; index < weights.length - 1; index++) { roll -= weights[index]; if (roll < 0) break; }
+      picked.push(remaining.splice(index, 1)[0]);
+    }
+    return picked;
+  }
+  function createSession(dict, words) {
+    session = { dictId: dict.id, words: [...words], index: 0, mode: 'cards', revealed: false, answered: false, results: {correct:0, wrong:0}, seen: new Set(), round: 1 };
     $('homeView').classList.add('hidden'); $('learnView').classList.remove('hidden');
     $('learnDictName').textContent = dict.name;
     document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === 'cards'));
+    renderStudy();
+  }
+  function repeatSameSession() {
+    if (!session) return;
+    const dict = data.dictionaries.find(d => d.id === session.dictId);
+    if (!dict) return;
+    const sameWords = [...session.words].sort(() => Math.random() - 0.5);
+    const mode = session.mode;
+    const round = (session.round || 1) + 1;
+    createSession(dict, sameWords);
+    session.mode = mode; session.round = round;
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     renderStudy();
   }
   function switchMode(mode) {
@@ -536,8 +616,16 @@
     $('sessionHint').textContent = 'Хорошая работа!';
     const total = session.words.length;
     const score = total ? Math.round(session.results.correct / total * 100) : 0;
-    $('studyArea').innerHTML = `<div class="finish-card glass"><div style="font-size:42px">${score >= 80 ? '🎉' : '🌟'}</div><div class="big-number">${score}%</div><h2>${score >= 80 ? 'Отличная работа!' : 'Хорошая практика!'}</h2><p class="support">Правильно: ${session.results.correct} · Нужно повторить: ${session.results.wrong}<br>Ты сделал ещё один шаг к своей цели.</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px"><button class="primary" id="againBtn">Повторить сессию</button><button class="secondary" id="finishHomeBtn">К словарям</button></div></div>`;
-    $('againBtn').addEventListener('click', () => { $('learnView').classList.add('hidden'); $('homeView').classList.remove('hidden'); startStudy(); });
+    const passed = score >= 90;
+    $('studyArea').innerHTML = `<div class="finish-card glass"><div style="font-size:42px">${passed ? '🎉' : '🌟'}</div><div class="big-number">${score}%</div><h2>${passed ? 'Слова усвоены отлично!' : 'Давай закрепим эти слова'}</h2><p class="support">Правильно: ${session.results.correct} · Нужно повторить: ${session.results.wrong}<br>${passed ? 'Порог 90% достигнут — теперь можно переходить к новым словам.' : 'Повтори этот же набор: слова будут в другом порядке. Продолжим, пока результат не достигнет 90%.'}</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px"><button class="primary" id="againBtn">${passed ? 'Учить новые слова' : 'Повторить сессию'}</button><button class="secondary" id="finishHomeBtn">К словарям</button></div></div>`;
+    $('againBtn').addEventListener('click', () => {
+      if (!passed) { repeatSameSession(); return; }
+      const completedIds = session.words.map(w => w.id);
+      const dict = data.dictionaries.find(d => d.id === session.dictId);
+      $('learnView').classList.add('hidden'); $('homeView').classList.remove('hidden');
+      session = null; render();
+      if (dict) { selectedId = dict.id; startStudy(completedIds); }
+    });
     $('finishHomeBtn').addEventListener('click', () => { $('learnView').classList.add('hidden'); $('homeView').classList.remove('hidden'); session = null; render(); });
     renderStrip();
   }
