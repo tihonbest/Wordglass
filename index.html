@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Wordglass">
+  <meta name="description" content="Личный тренажёр английских слов">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>Wordglass — английские слова</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --text: #17202f;
+      --muted: #7b8494;
+      --line: rgba(255,255,255,.78);
+      --glass: rgba(255,255,255,.62);
+      --glass-strong: rgba(255,255,255,.82);
+      --shadow: 0 18px 50px rgba(43, 61, 92, .10), inset 0 1px 0 rgba(255,255,255,.95);
+      --blue: #6d8cff;
+      --green: #20b879;
+      --red: #a92943;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(ellipse at 12% 0%, rgba(151,184,255,.38), transparent 35%),
+        radial-gradient(ellipse at 88% 12%, rgba(191,169,255,.30), transparent 30%),
+        radial-gradient(ellipse at 55% 95%, rgba(158,235,211,.27), transparent 34%), var(--bg);
+      background-attachment: fixed;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid rgba(109,140,255,.4); outline-offset: 2px; }
+    .app { width: min(1120px, 100%); margin: auto; padding: max(20px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom)); }
+    header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin: 8px 0 26px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand-icon { width:44px; height:44px; border-radius:16px; display:grid; place-items:center; color:#fff; font-weight:800; font-size:21px; background:linear-gradient(145deg,#9db7ff,#6e83ee 60%,#9c8af5); box-shadow:0 8px 20px #8196e94a; }
+    h1 { font-size:clamp(22px,4vw,30px); margin:0; letter-spacing:-.8px; }
+    .subtitle { color:var(--muted); font-size:13px; margin-top:3px; }
+    .top-note { color:var(--muted); font-size:13px; }
+    .glass {
+      background: var(--glass); border:1px solid var(--line); box-shadow:var(--shadow);
+      backdrop-filter: blur(24px) saturate(155%); -webkit-backdrop-filter: blur(24px) saturate(155%);
+    }
+    .toolbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .primary, .secondary, .dictionary-button, .mode-button, .choice, .answer-button {
+      border:1px solid rgba(255,255,255,.9); transition:transform .18s ease, box-shadow .18s ease, background .2s ease;
+    }
+    .primary { border:0; color:white; font-weight:650; padding:14px 19px; border-radius:17px; background:linear-gradient(135deg,#718dff,#8b7af0); box-shadow:0 9px 24px rgba(105,129,241,.27); white-space:nowrap; }
+    .primary:active,.secondary:active,.dictionary-button:active,.mode-button:active,.choice:active { transform:scale(.98); }
+    .secondary { color:var(--text); background:rgba(255,255,255,.64); padding:12px 16px; border-radius:15px; }
+    .dictionary-strip { display:flex; gap:10px; overflow-x:auto; padding:3px 2px 10px; scrollbar-width:thin; flex:1; }
+    .dictionary-button { min-width:145px; max-width:220px; text-align:left; border-radius:16px; padding:12px 14px 11px; background:rgba(255,255,255,.57); color:var(--text); box-shadow:0 6px 20px rgba(43,61,92,.05); }
+    .dictionary-button.active { border-color:rgba(109,140,255,.5); background:rgba(226,233,255,.78); }
+    .dictionary-button.complete { color:#fff; background:linear-gradient(135deg,#18b77c,#39ce91); border-color:transparent; box-shadow:0 8px 22px rgba(32,184,121,.23); }
+    .dict-title { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:650; font-size:14px; }
+    .dict-meta { display:block; margin-top:6px; font-size:11px; opacity:.75; }
+    .progress { height:5px; background:rgba(115,126,145,.14); border-radius:99px; margin-top:10px; overflow:hidden; }
+    .progress > span { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,#a42b43 0%,#e6a34c 52%,#20b879 100%); transition:width .35s ease; }
+    .complete .progress { display:none; }
+    .overview { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; margin:10px 0 22px; }
+    .panel { border-radius:24px; padding:22px; }
+    .eyebrow { font-size:12px; text-transform:uppercase; letter-spacing:1.3px; color:var(--muted); font-weight:700; }
+    .big-number { font-size:clamp(30px,5vw,42px); font-weight:750; letter-spacing:-1.5px; margin:9px 0 2px; }
+    .support { color:var(--muted); font-size:14px; line-height:1.5; }
+    .chart-wrap { display:flex; align-items:center; gap:18px; margin-top:12px; }
+    .donut { width:100px; height:100px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center; background:conic-gradient(#6e87f5 0deg, #dce3f2 0deg); position:relative; }
+    .donut::after { content:""; position:absolute; width:72px; height:72px; border-radius:50%; background:rgba(255,255,255,.92); box-shadow:inset 0 1px 5px rgba(30,50,90,.05); }
+    .donut strong { position:relative; z-index:1; font-size:19px; }
+    .legend { display:grid; gap:8px; color:var(--muted); font-size:13px; }
+    .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; background:#6e87f5; }
+    .dot.gray { background:#dce3f2; }
+    .section-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:26px 2px 12px; }
+    .section-heading h2 { margin:0; font-size:19px; letter-spacing:-.4px; }
+    .empty { text-align:center; padding:45px 20px; border-radius:24px; }
+    .empty-icon { font-size:36px; margin-bottom:12px; }
+    .empty h2 { margin:0 0 8px; }
+    .empty p { color:var(--muted); max-width:420px; margin:0 auto 18px; line-height:1.55; }
+    .words-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
+    .word-chip { border-radius:16px; padding:15px; }
+    .word-chip strong { display:block; font-size:16px; }
+    .word-chip span { display:block; color:var(--muted); margin-top:5px; font-size:13px; }
+    .motivation { margin-top:24px; padding:24px; border-radius:24px; display:flex; gap:16px; align-items:center; background:linear-gradient(120deg,rgba(255,255,255,.72),rgba(222,231,255,.55),rgba(222,249,238,.55)); }
+    .motivation-icon { font-size:30px; }
+    .motivation h3 { margin:0 0 6px; font-size:17px; }
+    .motivation p { margin:0; color:var(--muted); line-height:1.5; font-size:14px; }
+    .hidden { display:none !important; }
+    .modal-backdrop { position:fixed; inset:0; z-index:10; display:grid; place-items:center; padding:18px; background:rgba(23,32,47,.28); backdrop-filter:blur(8px); }
+    .modal { width:min(620px,100%); max-height:min(90vh,850px); overflow:auto; padding:24px; border-radius:26px; background:rgba(249,251,255,.92); box-shadow:0 30px 90px rgba(25,37,67,.22); border:1px solid rgba(255,255,255,.9); }
+    .modal-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+    .modal-head h2 { margin:0; font-size:22px; }
+    .icon-button { border:0; background:rgba(120,135,160,.12); width:38px; height:38px; border-radius:13px; font-size:20px; }
+    label { display:block; font-size:13px; font-weight:650; margin:15px 0 7px; }
+    input, textarea { width:100%; border:1px solid rgba(127,145,175,.24); background:rgba(255,255,255,.83); border-radius:13px; padding:13px 14px; color:var(--text); }
+    textarea { min-height:180px; resize:vertical; line-height:1.55; }
+    .hint { color:var(--muted); font-size:12px; line-height:1.5; margin-top:8px; }
+    .modal-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:9px; margin-top:18px; }
+    .learn-view { max-width:760px; margin:0 auto; }
+    .learn-top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+    .learn-top h2 { font-size:20px; margin:0; }
+    .session-progress { height:6px; border-radius:99px; overflow:hidden; background:rgba(120,135,160,.16); margin-bottom:18px; }
+    .session-progress span { display:block; height:100%; background:linear-gradient(90deg,#7e93ff,#47c99a); transition:width .3s; }
+    .mode-row { display:flex; gap:8px; margin-bottom:16px; }
+    .mode-button { flex:1; padding:12px 8px; border-radius:14px; color:var(--muted); background:rgba(255,255,255,.56); }
+    .mode-button.active { background:rgba(224,231,255,.9); color:#435fce; border-color:rgba(109,140,255,.35); font-weight:700; }
+    .study-card { min-height:290px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:28px; border-radius:28px; cursor:pointer; user-select:none; transition:transform .25s ease; }
+    .study-card:active { transform:scale(.99); }
+    .word-label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:1.5px; }
+    .study-word { font-size:clamp(34px,8vw,54px); letter-spacing:-1.6px; font-weight:760; margin:18px 0 10px; overflow-wrap:anywhere; }
+    .study-translation { font-size:clamp(22px,5vw,30px); font-weight:650; }
+    .tap-hint { color:var(--muted); font-size:13px; margin-top:22px; }
+    .card-actions { display:flex; gap:10px; margin-top:14px; }
+    .answer-button { flex:1; border-radius:16px; padding:14px 12px; font-weight:650; background:rgba(255,255,255,.75); }
+    .answer-button.good { color:#087d50; background:rgba(196,246,222,.8); }
+    .answer-button.again { color:#a32b43; background:rgba(255,221,228,.8); }
+    .quiz-question { font-size:clamp(24px,5vw,34px); font-weight:750; text-align:center; margin:28px 0; overflow-wrap:anywhere; }
+    .choices { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .choice { padding:18px 12px; min-height:70px; border-radius:17px; background:rgba(255,255,255,.76); color:var(--text); font-weight:600; overflow-wrap:anywhere; }
+    .choice.correct { background:rgba(194,246,219,.95); border-color:#4bc58d; }
+    .choice.wrong { background:rgba(255,220,226,.95); border-color:#e88b9c; }
+    .feedback { min-height:25px; margin:14px 0 0; text-align:center; color:var(--muted); font-size:14px; }
+    .typing-form { display:flex; gap:9px; margin-top:15px; }
+    .typing-form input { flex:1; min-width:0; }
+    .typing-form .primary { padding:12px 17px; }
+    .session-footer { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:17px; color:var(--muted); font-size:13px; }
+    .finish-card { text-align:center; padding:35px 22px; border-radius:26px; }
+    .finish-card .big-number { font-size:48px; }
+    .toast { position:fixed; bottom:max(22px,env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:20; background:#1d293b; color:#fff; padding:12px 18px; border-radius:14px; box-shadow:0 10px 35px #1d293b33; font-size:14px; max-width:calc(100% - 30px); }
+    footer { text-align:center; color:#9aa3b2; font-size:12px; padding:25px 0 4px; }
+    @media (max-width:700px) {
+      .app { padding-left:14px; padding-right:14px; }
+      header { align-items:flex-start; }
+      .top-note { display:none; }
+      .toolbar { align-items:stretch; flex-direction:column; }
+      .dictionary-strip { order:2; margin:0 -2px; }
+      .primary { align-self:flex-start; }
+      .overview { grid-template-columns:1fr; }
+      .panel { padding:19px; }
+      .choices { grid-template-columns:1fr; }
+      .choice { min-height:57px; }
+      .study-card { min-height:255px; }
+      .modal { padding:20px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *,*::before,*::after { transition:none !important; scroll-behavior:auto !important; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="brand-icon">W</div>
+      <div><h1>Wordglass</h1><div class="subtitle">Твои слова. Твой темп.</div></div>
+    </div>
+    <div class="top-note">Маленькие шаги — большой результат ✦</div>
+  </header>
+
+  <div id="homeView">
+    <div class="toolbar">
+      <button class="primary" id="createBtn">＋ Создать словарь</button>
+      <div class="dictionary-strip" id="dictionaryStrip" aria-label="Мои словари"></div>
+    </div>
+
+    <div id="emptyState" class="empty glass">
+      <div class="empty-icon">📚</div>
+      <h2>Начнём с первого словаря?</h2>
+      <p>Создай словарь из слов <em>Check these words</em> из учебника. Слова можно добавлять списком — ограничений по количеству нет.</p>
+      <button class="primary" id="emptyCreateBtn">＋ Создать словарь</button>
+    </div>
+
+    <div id="dashboard" class="hidden">
+      <div class="overview">
+        <section class="panel glass">
+          <div class="eyebrow">Общий прогресс</div>
+          <div class="big-number" id="overallPercent">0%</div>
+          <div class="support" id="overallCaption">Каждое слово приближает тебя к цели.</div>
+          <div class="progress" style="height:8px;margin-top:17px"><span id="overallBar" style="width:0%"></span></div>
+        </section>
+        <section class="panel glass">
+          <div class="eyebrow">Твоя коллекция</div>
+          <div class="chart-wrap">
+            <div class="donut" id="overallDonut"><strong id="donutPercent">0%</strong></div>
+            <div class="legend">
+              <div><i class="dot"></i><span id="knownLegend">0 выучено</span></div>
+              <div><i class="dot gray"></i><span id="unknownLegend">0 осталось</span></div>
+              <div class="support" id="totalWords">0 слов в 0 словарях</div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="section-heading">
+        <h2 id="selectedTitle">Выбери словарь</h2>
+        <button class="secondary" id="renameBtn">Переименовать</button>
+      </div>
+      <div id="selectedDictionaryContent"></div>
+      <div class="motivation">
+        <div class="motivation-icon">🌱</div>
+        <div>
+          <h3 id="motivationTitle">Каждое слово — шаг к свободному английскому.</h3>
+          <p id="motivationText">Не обязательно выучить всё за один вечер. Возвращайся к словам понемногу — и однажды заметишь, сколько уже знаешь.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="learnView" class="learn-view hidden">
+    <div class="learn-top">
+      <div><div class="eyebrow" id="learnDictName">Словарь</div><h2 id="learnModeTitle">Учёба</h2></div>
+      <button class="secondary" id="backHomeBtn">← К словарям</button>
+    </div>
+    <div class="session-progress"><span id="sessionBar" style="width:0%"></span></div>
+    <div class="mode-row">
+      <button class="mode-button active" data-mode="cards">Карточки</button>
+      <button class="mode-button" data-mode="quiz">Квиз</button>
+      <button class="mode-button" data-mode="typing">Проверка</button>
+    </div>
+    <div id="studyArea"></div>
+    <div class="session-footer"><span id="sessionCounter">Слово 1 из 10</span><span id="sessionHint">Сессия до 10 слов</span></div>
+  </div>
+  <footer>Wordglass · Слова и прогресс хранятся на этом устройстве</footer>
+</div>
+
+<div id="modalBackdrop" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head"><h2 id="modalTitle">Создать словарь</h2><button class="icon-button" id="closeModalBtn" aria-label="Закрыть">×</button></div>
+    <form id="dictionaryForm">
+      <label for="dictionaryName">Название словаря</label>
+      <input id="dictionaryName" maxlength="80" placeholder="Например, Check these words — Unit 3" required>
+      <label for="wordInput">Слова и переводы</label>
+      <textarea id="wordInput" placeholder="apple — яблоко&#10;butterfly — бабочка&#10;to improve, улучшать" required></textarea>
+      <div class="hint">Одна пара на строку. Форматы: <b>apple — яблоко</b>, <b>apple, яблоко</b> или <b>apple: яблоко</b>. Также можно разделять пары точкой с запятой: <b>apple, яблоко; dog, собака</b>. Английское слово ставь первым.</div>
+      <div class="modal-actions"><button type="button" class="secondary" id="cancelModalBtn">Отмена</button><button type="submit" class="primary">Сохранить словарь</button></div>
+    </form>
+  </div>
+</div>
+<div id="toast" class="toast hidden" role="status"></div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'wordglass_data_v1';
+  const $ = (id) => document.getElementById(id);
+  let data = loadData();
+  let selectedId = data.dictionaries[0]?.id || null;
+  let session = null;
+  let toastTimer;
+
+  function loadData() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (parsed && Array.isArray(parsed.dictionaries)) return parsed;
+    } catch (_) {}
+    return { dictionaries: [] };
+  }
+  function saveData() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+    catch (_) { showToast('Не удалось сохранить данные. Возможно, память браузера заполнена.'); }
+  }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function esc(value) {
+    return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function showToast(message) {
+    $('toast').textContent = message; $('toast').classList.remove('hidden');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 2700);
+  }
+  function selectedDictionary() { return data.dictionaries.find(d => d.id === selectedId) || null; }
+  function wordKnown(word) { return (word.correct || 0) >= 2 && (word.wrong || 0) === 0; }
+  function dictionaryStats(dict) {
+    const total = dict.words.length;
+    const known = dict.words.filter(wordKnown).length;
+    return { total, known, percent: total ? Math.round(known / total * 100) : 0 };
+  }
+  function allStats() {
+    let total = 0, known = 0;
+    data.dictionaries.forEach(d => { const s = dictionaryStats(d); total += s.total; known += s.known; });
+    return { total, known, percent: total ? Math.round(known / total * 100) : 0 };
+  }
+  function render() {
+    renderStrip();
+    const has = data.dictionaries.length > 0;
+    $('emptyState').classList.toggle('hidden', has);
+    $('dashboard').classList.toggle('hidden', !has);
+    if (!has) return;
+    if (!selectedDictionary()) selectedId = data.dictionaries[0].id;
+    renderDashboard();
+  }
+  function renderStrip() {
+    const strip = $('dictionaryStrip');
+    strip.innerHTML = data.dictionaries.map(d => {
+      const s = dictionaryStats(d);
+      return `<button class="dictionary-button ${d.id === selectedId ? 'active' : ''} ${s.percent === 100 && s.total ? 'complete' : ''}" data-dict="${esc(d.id)}">
+        <span class="dict-title">${s.percent === 100 && s.total ? '✓ ' : ''}${esc(d.name)}</span>
+        <span class="dict-meta">${s.known}/${s.total} слов · ${s.percent}%</span>
+        <span class="progress"><span style="width:${s.percent}%"></span></span>
+      </button>`;
+    }).join('');
+    strip.querySelectorAll('[data-dict]').forEach(btn => btn.addEventListener('click', () => {
+      selectedId = btn.dataset.dict; render();
+    }));
+  }
+  function renderDashboard() {
+    const overall = allStats(), dict = selectedDictionary(), s = dictionaryStats(dict);
+    $('overallPercent').textContent = overall.percent + '%';
+    $('overallCaption').textContent = overall.total ? `Уже освоено ${overall.known} из ${overall.total} слов.` : 'Добавь слова и начни свою коллекцию.';
+    $('overallBar').style.width = overall.percent + '%';
+    $('donutPercent').textContent = overall.percent + '%';
+    $('overallDonut').style.background = `conic-gradient(#6e87f5 ${overall.percent * 3.6}deg, #dce3f2 0deg)`;
+    $('knownLegend').textContent = `${overall.known} выучено`;
+    $('unknownLegend').textContent = `${overall.total - overall.known} осталось`;
+    $('totalWords').textContent = `${overall.total} слов в ${data.dictionaries.length} словарях`;
+    $('selectedTitle').textContent = dict.name;
+    $('renameBtn').textContent = 'Переименовать';
+    $('motivationTitle').textContent = s.percent === 100 && s.total ? 'Словарь покорён! Отличная работа.' : 'Каждое слово — шаг к свободному английскому.';
+    $('motivationText').textContent = s.percent === 100 && s.total
+      ? 'Ты завершил этот словарь. Сохрани его как личное достижение или переходи к следующему — впереди ещё много слов.'
+      : `В этом словаре уже ${s.percent}% прогресса. Не гонись за идеалом — повторение помогает знаниям остаться с тобой надолго.`;
+    const words = dict.words.slice(0, 12).map(w => `<div class="word-chip glass"><strong>${esc(w.en)}</strong><span>${esc(w.ru)}</span></div>`).join('');
+    $('selectedDictionaryContent').innerHTML = `
+      <section class="panel glass">
+        <div class="eyebrow">Прогресс словаря</div>
+        <div class="big-number">${s.percent}%</div>
+        <div class="support">${s.known} выучено из ${s.total}. ${s.total > 12 ? 'Ниже показаны первые 12 слов.' : ''}</div>
+        <div class="progress" style="height:8px;margin:15px 0 20px"><span style="width:${s.percent}%"></span></div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="primary" id="startStudyBtn">Начать учить · до 10 слов</button>
+          <button class="secondary" id="addMoreBtn">＋ Добавить слова</button>
+          <button class="secondary" id="exportBtn">Экспорт словаря</button>
+          <button class="secondary" id="deleteDictBtn">Удалить</button>
+        </div>
+      </section>
+      <div class="section-heading"><h2>Слова в словаре</h2><span class="support">${s.total} всего</span></div>
+      <div class="words-grid">${words || '<p class="support">В этом словаре пока нет слов.</p>'}</div>`;
+    $('startStudyBtn').addEventListener('click', startStudy);
+    $('addMoreBtn').addEventListener('click', () => openModal('add'));
+    $('exportBtn').addEventListener('click', exportDictionary);
+    $('deleteDictBtn').addEventListener('click', deleteDictionary);
+  }
+  function parseWords(raw) {
+    const normalized = raw.replace(/\r/g, '').trim();
+    if (!normalized) return [];
+    const chunks = normalized.split(/[;\n]+/).map(s => s.trim()).filter(Boolean);
+    const pairs = [];
+    for (const chunk of chunks) {
+      let parts;
+      if (chunk.includes('—')) parts = chunk.split('—');
+      else if (chunk.includes('–')) parts = chunk.split('–');
+      else if (chunk.includes(' -> ')) parts = chunk.split(' -> ');
+      else if (chunk.includes(':')) parts = chunk.split(':');
+      else if (chunk.includes(',')) parts = chunk.split(',');
+      else if (chunk.includes('\t')) parts = chunk.split('\t');
+      else continue;
+      if (parts.length < 2) continue;
+      const en = parts.shift().trim();
+      const ru = parts.join(',').trim();
+      if (en && ru) pairs.push({ en, ru });
+    }
+    const seen = new Set();
+    return pairs.filter(p => {
+      const key = p.en.toLowerCase() + '|' + p.ru.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+  }
+  let modalMode = 'create';
+  function openModal(mode = 'create') {
+    modalMode = mode;
+    $('modalTitle').textContent = mode === 'add' ? 'Добавить слова' : 'Создать словарь';
+    $('dictionaryName').classList.toggle('hidden', mode === 'add');
+    $('dictionaryName').required = mode !== 'add';
+    $('wordInput').value = '';
+    if (mode === 'create') $('dictionaryName').value = '';
+    $('modalBackdrop').classList.remove('hidden');
+    setTimeout(() => $(mode === 'add' ? 'wordInput' : 'dictionaryName').focus(), 60);
+  }
+  function closeModal() { $('modalBackdrop').classList.add('hidden'); }
+  $('createBtn').addEventListener('click', () => openModal());
+  $('emptyCreateBtn').addEventListener('click', () => openModal());
+  $('closeModalBtn').addEventListener('click', closeModal);
+  $('cancelModalBtn').addEventListener('click', closeModal);
+  $('modalBackdrop').addEventListener('click', e => { if (e.target === $('modalBackdrop')) closeModal(); });
+  $('dictionaryForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const words = parseWords($('wordInput').value);
+    if (!words.length) { showToast('Не нашёл пары слов. Проверь формат: apple — яблоко'); return; }
+    if (modalMode === 'add') {
+      const dict = selectedDictionary();
+      if (!dict) { showToast('Сначала создай словарь.'); return; }
+      const existing = new Set(dict.words.map(w => w.en.toLowerCase()));
+      let added = 0;
+      words.forEach(p => {
+        if (!existing.has(p.en.toLowerCase())) {
+          dict.words.push({ id: uid(), en: p.en, ru: p.ru, correct: 0, wrong: 0 });
+          existing.add(p.en.toLowerCase()); added++;
+        }
+      });
+      saveData(); closeModal(); render();
+      showToast(added ? `Добавлено слов: ${added}` : 'Такие английские слова уже есть в словаре.');
+    } else {
+      const dict = { id: uid(), name: $('dictionaryName').value.trim(), words: words.map(p => ({ id: uid(), en: p.en, ru: p.ru, correct: 0, wrong: 0 })) };
+      data.dictionaries.push(dict); selectedId = dict.id; saveData(); closeModal(); render();
+      showToast(`Создан словарь · ${words.length} слов`);
+    }
+  });
+  $('renameBtn').addEventListener('click', () => {
+    const dict = selectedDictionary(); if (!dict) return;
+    const name = prompt('Новое название словаря:', dict.name);
+    if (name && name.trim()) { dict.name = name.trim().slice(0,80); saveData(); render(); }
+  });
+  function deleteDictionary() {
+    const dict = selectedDictionary(); if (!dict) return;
+    if (!confirm(`Удалить словарь «${dict.name}» вместе с его прогрессом?`)) return;
+    data.dictionaries = data.dictionaries.filter(d => d.id !== dict.id);
+    selectedId = data.dictionaries[0]?.id || null; saveData(); render(); showToast('Словарь удалён');
+  }
+  function exportDictionary() {
+    const dict = selectedDictionary(); if (!dict) return;
+    const content = dict.words.map(w => `${w.en} — ${w.ru}`).join('\n');
+    const blob = new Blob([`# ${dict.name}\n${content}\n`], {type:'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = dict.name.replace(/[^\p{L}\p{N}_-]+/gu,'_') + '.txt'; a.click(); URL.revokeObjectURL(url);
+  }
+
+  function startStudy() {
+    const dict = selectedDictionary();
+    if (!dict || !dict.words.length) { showToast('Добавь в словарь хотя бы одну пару слов.'); return; }
+    const unlearned = dict.words.filter(w => !wordKnown(w));
+    const pool = unlearned.length ? unlearned : dict.words;
+    const shuffled = [...pool].sort(() => Math.random() - .5);
+    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
+    session = { dictId: dict.id, words: selected, index: 0, mode: 'cards', revealed: false, answered: false, results: {correct:0, wrong:0}, seen: new Set() };
+    $('homeView').classList.add('hidden'); $('learnView').classList.remove('hidden');
+    $('learnDictName').textContent = dict.name;
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === 'cards'));
+    renderStudy();
+  }
+  function switchMode(mode) {
+    if (!session) return;
+    session.mode = mode; session.revealed = false; session.answered = false;
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    renderStudy();
+  }
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => switchMode(b.dataset.mode)));
+  $('backHomeBtn').addEventListener('click', () => {
+    $('learnView').classList.add('hidden'); $('homeView').classList.remove('hidden'); session = null; render();
+  });
+  function renderStudy() {
+    if (!session) return;
+    const dict = data.dictionaries.find(d => d.id === session.dictId);
+    if (!dict) return;
+    const total = session.words.length, i = session.index;
+    $('learnModeTitle').textContent = ({cards:'Карточки',quiz:'Квиз · 4 варианта',typing:'Проверка знаний'})[session.mode];
+    $('sessionBar').style.width = `${(i / total) * 100}%`;
+    $('sessionCounter').textContent = `Слово ${Math.min(i+1,total)} из ${total}`;
+    $('sessionHint').textContent = `Правильно: ${session.results.correct} · Повторить: ${session.results.wrong}`;
+    if (i >= total) { renderFinish(); return; }
+    const word = session.words[i];
+    if (session.mode === 'cards') {
+      $('studyArea').innerHTML = `<div class="study-card glass" id="flipCard" role="button" tabindex="0" aria-label="Перевернуть карточку">
+        <div class="word-label">${session.revealed ? 'Перевод' : 'Английское слово'}</div>
+        <div class="study-word">${esc(session.revealed ? word.ru : word.en)}</div>
+        <div class="tap-hint">${session.revealed ? 'Вспомнил слово?' : 'Нажми, чтобы перевернуть карточку ↻'}</div>
+      </div>
+      ${session.revealed ? `<div class="card-actions"><button class="answer-button again" id="didntKnow">↺ Нужно повторить</button><button class="answer-button good" id="didKnow">✓ Запомнил</button></div>` : ''}`;
+      const flip = () => { if (!session.revealed) { session.revealed = true; renderStudy(); } };
+      $('flipCard').addEventListener('click', flip);
+      $('flipCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }});
+      if (session.revealed) {
+        $('didntKnow').addEventListener('click', () => answer(false));
+        $('didKnow').addEventListener('click', () => answer(true));
+      }
+    } else if (session.mode === 'quiz') {
+      const options = buildOptions(dict, word);
+      $('studyArea').innerHTML = `<div class="panel glass" style="border-radius:26px"><div class="word-label" style="text-align:center">Выбери правильный перевод</div><div class="quiz-question">${esc(word.en)}</div><div class="choices">${options.map((o,n) => `<button class="choice" data-choice="${n}">${esc(o.ru)}</button>`).join('')}</div><div class="feedback" id="feedback"></div><div style="text-align:center"><button class="primary hidden" id="nextQuestion">Дальше →</button></div></div>`;
+      $('studyArea').querySelectorAll('[data-choice]').forEach(btn => btn.addEventListener('click', () => {
+        if (session.answered) return;
+        session.answered = true;
+        const chosen = options[Number(btn.dataset.choice)];
+        const correct = chosen.id === word.id;
+        session.seen.add(word.id);
+        if (correct) { word.correct = (word.correct || 0) + 1; word.wrong = 0; session.results.correct++; }
+        else { word.wrong = (word.wrong || 0) + 1; session.results.wrong++; }
+        $('studyArea').querySelectorAll('[data-choice]').forEach(b => {
+          const opt = options[Number(b.dataset.choice)];
+          if (opt.id === word.id) b.classList.add('correct');
+          else if (b === btn) b.classList.add('wrong');
+          b.disabled = true;
+        });
+        $('feedback').textContent = correct ? 'Верно! Отлично ✨' : `Почти. Правильный ответ: ${word.ru}`;
+        $('nextQuestion').classList.remove('hidden');
+        saveData();
+      }));
+      $('nextQuestion').addEventListener('click', nextWord);
+    } else {
+      $('studyArea').innerHTML = `<div class="panel glass" style="border-radius:26px;text-align:center;padding:30px 22px"><div class="word-label">Напиши перевод на русском</div><div class="quiz-question">${esc(word.en)}</div><form class="typing-form" id="typingForm"><input id="typingAnswer" autocomplete="off" autocapitalize="off" placeholder="Твой перевод…" aria-label="Перевод"><button class="primary" type="submit">Проверить</button></form><div class="feedback" id="feedback"></div><div style="text-align:center"><button class="primary hidden" id="nextQuestion">Дальше →</button></div></div>`;
+      $('typingAnswer').focus({preventScroll:true});
+      $('typingForm').addEventListener('submit', e => {
+        e.preventDefault(); if (session.answered) return;
+        session.answered = true;
+        const typed = $('typingAnswer').value.trim().toLowerCase().replace(/[.!?]/g,'');
+        const answers = word.ru.toLowerCase().split(/[;,/]/).map(s => s.trim().replace(/[.!?]/g,''));
+        const correct = answers.some(a => a === typed);
+        session.seen.add(word.id);
+        if (correct) { word.correct = (word.correct || 0) + 1; word.wrong = 0; session.results.correct++; }
+        else { word.wrong = (word.wrong || 0) + 1; session.results.wrong++; }
+        $('typingAnswer').disabled = true;
+        $('feedback').textContent = correct ? 'Верно! Отличная работа ✨' : `Правильный перевод: ${word.ru}`;
+        $('nextQuestion').classList.remove('hidden'); saveData();
+      });
+      $('nextQuestion').addEventListener('click', nextWord);
+    }
+  }
+  function buildOptions(dict, word) {
+    const others = dict.words.filter(w => w.id !== word.id).sort(() => Math.random() - .5).slice(0,3);
+    const options = [...others, word].sort(() => Math.random() - .5);
+    while (options.length < Math.min(4, dict.words.length)) options.push(word);
+    return options;
+  }
+  function answer(correct) {
+    const word = session.words[session.index];
+    session.seen.add(word.id);
+    if (correct) { word.correct = (word.correct || 0) + 1; word.wrong = 0; session.results.correct++; }
+    else { word.wrong = (word.wrong || 0) + 1; session.results.wrong++; }
+    saveData(); session.index++; session.revealed = false; session.answered = false; renderStudy();
+  }
+  function nextWord() { session.index++; session.revealed = false; session.answered = false; renderStudy(); }
+  function renderFinish() {
+    $('sessionBar').style.width = '100%';
+    $('sessionCounter').textContent = 'Сессия завершена';
+    $('sessionHint').textContent = 'Хорошая работа!';
+    const total = session.words.length;
+    const score = total ? Math.round(session.results.correct / total * 100) : 0;
+    $('studyArea').innerHTML = `<div class="finish-card glass"><div style="font-size:42px">${score >= 80 ? '🎉' : '🌟'}</div><div class="big-number">${score}%</div><h2>${score >= 80 ? 'Отличная работа!' : 'Хорошая практика!'}</h2><p class="support">Правильно: ${session.results.correct} · Нужно повторить: ${session.results.wrong}<br>Ты сделал ещё один шаг к своей цели.</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px"><button class="primary" id="againBtn">Повторить сессию</button><button class="secondary" id="finishHomeBtn">К словарям</button></div></div>`;
+    $('againBtn').addEventListener('click', () => { $('learnView').classList.add('hidden'); $('homeView').classList.remove('hidden'); startStudy(); });
+    $('finishHomeBtn').addEventListener('click', () => { $('learnView').classList.add('hidden'); $('homeView').classList.remove('hidden'); session = null; render(); });
+    renderStrip();
+  }
+  render();
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>
