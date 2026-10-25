@@ -385,7 +385,7 @@
       </section>
       <div class="section-heading"><h2>Слова в словаре</h2><span class="support">${s.total} всего</span></div>
       <div class="words-grid">${words || '<p class="support">В этом словаре пока нет слов.</p>'}</div>`;
-    $('startStudyBtn').addEventListener('click', startStudy);
+    $('startStudyBtn').addEventListener('click', () => startStudy());
     $('addMoreBtn').addEventListener('click', () => openModal('add'));
     $('exportBtn').addEventListener('click', exportDictionary);
     $('deleteDictBtn').addEventListener('click', deleteDictionary);
@@ -631,7 +631,11 @@
   }
   render();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+        .then(registration => registration.update())
+        .catch(() => {});
+    });
   }
 })();
 </script>
